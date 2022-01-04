@@ -38,8 +38,8 @@ install:
 #---------------------------------#
 
 platform:
-  - x86
-  - x64
+  - ARM
+  # - x64
 
 configuration:
   - GCC_5
