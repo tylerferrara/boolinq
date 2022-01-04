@@ -4,138 +4,126 @@ branches:
   only:
     - master
 
-# Maximum number of concurrent jobs for the project
-max_jobs: 1
+clone_folder: c:\projects\boolinq
 
 cache:
-  - /tmp/tools
+- c:\tools\vcpkg\installed\
 
-#---------------------------------#
-#    environment configuration    #
-#---------------------------------#
-
-image:
-  - Ubuntu1804
-  # - Ubuntu1604
-  # - Ubuntu2004
-
-environment:
-  CMAKE_VERSION_PREFIX: 3.22
-  CMAKE_VERSION_FULL: 3.22.1
-
-matrix:
-  # fail immediately once one of the job fails
-  fast_finish: true
-
-# scripts that run after cloning repository
-install:
-  - cmd: sudo apt-get update -y
-  - cmd: sudo apt-get upgrade -y
-  - cmd: pip install --user cpp-coveralls
-
-#---------------------------------#
-#       build configuration       #
-#---------------------------------#
+# Maximum number of concurrent jobs for the project
+# NOTE: This depends on your AppVeyor plan.
+# The Open-Source (FREE) teir limits to 1 concurrent job
+max_jobs: 1
 
 platform:
+  # - x86
+  # - x64
   - ARM
-  - x64
-  - x86
+
+# Create jobs for each C++ language standard
+environment:
+  matrix:
+  - job_name: C++11
+    APPVEYOR_CXX_LANG_STANDARD: 11
+
+  - job_name: C++14
+    APPVEYOR_CXX_LANG_STANDARD: 14
+
+  - job_name: C++17
+    APPVEYOR_CXX_LANG_STANDARD: 17
+
+  # - job_name: C++20
+  #   APPVEYOR_CXX_LANG_STANDARD: 20
 
 configuration:
-  - GCC_5
+  - GCC
+  - CLANG
+  # - MSVC
+
+# Any failure will terminate the build
+matrix:
+  fast_finish: true
+  allow_failures:
+    - job_name: C++11
+
+image:
+  - Visual Studio 2022
+
+install:
+  - cd C:\Tools\vcpkg
+  - git pull
+  - vcpkg integrate install
+  - .\bootstrap-vcpkg.bat
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - git submodule update --init --recursive
 
 for:
   -
     matrix:
       only:
-        - configuration: GCC_5
+        - configuration: MSVC
     before_build:
-      - cmd: sudo apt-get install g++5 gcc-5 gcov-5 -y
+      - set CC=cl
+      - set CXX=cl
     build_script:
-      - echo some build script
-    after_build:
+      - >-
+        cmake
+        -B build
+        -S .
+        -DCMAKE_CXX_STANDARD=%APPVEYOR_CXX_LANG_STANDARD%
+        -DCMAKE_CXX_EXTENSIONS=OFF
+        -DCMAKE_TOOLCHAIN_FILE="c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      - cmake --build build
+    test_script:
+      - cd build && ctest
 
-#---------------------------------#
-#       tests configuration       #
-#---------------------------------#
+  -
+    matrix:
+      only:
+        - configuration: CLANG
+    before_build:
+      - choco install llvm make
+      - cmd: refreshenv
+      - set CC=clang
+      - set CXX=clang++
+    build_script:
+      - >-
+        cmake
+        -B build
+        -S . 
+        -G "Unix Makefiles"
+        -DCMAKE_CXX_STANDARD=%APPVEYOR_CXX_LANG_STANDARD%
+        -DCMAKE_CXX_EXTENSIONS=OFF
+        -DCMAKE_TOOLCHAIN_FILE="c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        -DCMAKE_CXX_COMPILER="c:/Program Files/LLVM/bin/clang++.exe"
+        -DCMAKE_C_COMPILER="c:/Program Files/LLVM/bin/clang.exe"
+        -DRUN_HAVE_STD_REGEX=OFF
+        -DRUN_HAVE_POSIX_REGEX=OFF
+        -DRUN_HAVE_GNU_POSIX_REGEX=OFF
+      - cmake --build build
+    test_script:
+      - cd build && ctest
 
-# to run tests against only selected assemblies and/or categories
-# test:
-#   assemblies:
-#     only:
-#       - asm1.dll
-#       - asm2.dll
-
-#   categories:
-#     only:
-#       - UI
-#       - E2E
-
-# scripts to run before tests (working directory and environment changes are persisted from the previous steps such as "before_build")
-before_test:
-  - cmd: ls -la .
-
-# to run your custom scripts instead of automatic tests
-test_script:
-  - echo This is my custom test script
-
-# scripts to run after tests
-after_test:
-
-#---------------------------------#
-#     deployment configuration    #
-#---------------------------------#
-
-# providers: Local, FTP, WebDeploy, AzureCS, AzureBlob, S3, NuGet, Environment
-# provider names are case-sensitive!
-# deploy:
-#     # Deploy to GitHub Releases
-#   - provider: GitHub
-#     artifact: /.*\.nupkg/           # upload all NuGet packages to release assets
-#     draft: false
-#     prerelease: false
-#     on:
-#       branch: master                # release from master branch only
-#       APPVEYOR_REPO_TAG: true       # deploy on tag push only
-
-# # scripts to run before deployment
-# before_deploy:
-
-# # scripts to run after deployment
-# after_deploy:
-
-# # to run your custom scripts instead of provider deployments
-# deploy_script:
-
-#---------------------------------#
-#        global handlers          #
-#---------------------------------#
-
-# on successful build
-# on_success:
-#   - do something
-
-# # on build failure
-# on_failure:
-#   - do something
-
-# # after build failure or success
-# on_finish:
-#   - do something
-
-#---------------------------------#
-#         notifications           #
-#---------------------------------#
-
-# notifications:
-
-#   # Email
-#   - provider: Email
-#     to:
-#       - user1@email.com
-#       - user2@email.com
-#     subject: 'Build {{status}}'                  # optional
-#     message: "{{message}}, {{commitId}}, ..."    # optional
-#     on_build_status_changed: true
-
+  -
+    matrix:
+      only:
+        - configuration: GCC
+    before_build:
+      - choco install winlibs-llvm-free make
+      - cmd: refreshenv
+      - where gcc
+      - set CC=gcc
+      - set CXX=gcc
+    build_script:
+      - >-
+        cmake
+        -B build
+        -S . 
+        -G "Unix Makefiles"
+        -DCMAKE_CXX_STANDARD=%APPVEYOR_CXX_LANG_STANDARD%
+        -DCMAKE_CXX_EXTENSIONS=OFF
+        -DCMAKE_TOOLCHAIN_FILE="c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        -DCMAKE_CXX_COMPILER="C:/ProgramData/chocolatey/lib/winlibs-llvm-free/tools/mingw64/bin/gcc.exe"
+        -DCMAKE_C_COMPILER="C:/ProgramData/chocolatey/lib/winlibs-llvm-free/tools/mingw64/bin/gcc.exe"
+      - cmake --build build
+    test_script:
+      - cd build && ctest
