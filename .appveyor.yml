@@ -1,0 +1,140 @@
+version: '3.0.{build}'
+
+branches:
+  only:
+    - master
+
+# Maximum number of concurrent jobs for the project
+max_jobs: 1
+
+cache:
+  - /tmp/tools
+
+#---------------------------------#
+#    environment configuration    #
+#---------------------------------#
+
+image:
+  - Ubuntu1804
+  # - Ubuntu1604
+  # - Ubuntu2004
+
+environment:
+  CMAKE_VERSION_PREFIX: 3.22
+  CMAKE_VERSION_FULL: 3.22.1
+
+matrix:
+  # fail immediately once one of the job fails
+  fast_finish: true
+
+# scripts that run after cloning repository
+install:
+  - cmd: sudo apt-get update -y
+  - cmd: sudo apt-get upgrade -y
+  - cmd: pip install --user cpp-coveralls
+
+#---------------------------------#
+#       build configuration       #
+#---------------------------------#
+
+platform:
+  - x86
+  - x64
+
+configuration:
+  - GCC_5
+
+for:
+  -
+    matrix:
+      only:
+        - configuration: GCC_5
+    before_build:
+      - cmd: sudo apt-get install g++5 gcc-5 gcov-5 -y
+    build_script:
+      - echo some build script
+    after_build:
+
+#---------------------------------#
+#       tests configuration       #
+#---------------------------------#
+
+# to run tests against only selected assemblies and/or categories
+# test:
+#   assemblies:
+#     only:
+#       - asm1.dll
+#       - asm2.dll
+
+#   categories:
+#     only:
+#       - UI
+#       - E2E
+
+# scripts to run before tests (working directory and environment changes are persisted from the previous steps such as "before_build")
+before_test:
+  - cmd: ls -la .
+
+# to run your custom scripts instead of automatic tests
+test_script:
+  - echo This is my custom test script
+
+# scripts to run after tests
+after_test:
+
+#---------------------------------#
+#     deployment configuration    #
+#---------------------------------#
+
+# providers: Local, FTP, WebDeploy, AzureCS, AzureBlob, S3, NuGet, Environment
+# provider names are case-sensitive!
+# deploy:
+#     # Deploy to GitHub Releases
+#   - provider: GitHub
+#     artifact: /.*\.nupkg/           # upload all NuGet packages to release assets
+#     draft: false
+#     prerelease: false
+#     on:
+#       branch: master                # release from master branch only
+#       APPVEYOR_REPO_TAG: true       # deploy on tag push only
+
+# # scripts to run before deployment
+# before_deploy:
+
+# # scripts to run after deployment
+# after_deploy:
+
+# # to run your custom scripts instead of provider deployments
+# deploy_script:
+
+#---------------------------------#
+#        global handlers          #
+#---------------------------------#
+
+# on successful build
+# on_success:
+#   - do something
+
+# # on build failure
+# on_failure:
+#   - do something
+
+# # after build failure or success
+# on_finish:
+#   - do something
+
+#---------------------------------#
+#         notifications           #
+#---------------------------------#
+
+# notifications:
+
+#   # Email
+#   - provider: Email
+#     to:
+#       - user1@email.com
+#       - user2@email.com
+#     subject: 'Build {{status}}'                  # optional
+#     message: "{{message}}, {{commitId}}, ..."    # optional
+#     on_build_status_changed: true
+
