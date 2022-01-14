@@ -1,0 +1,67 @@
+version: '3.0.{build}'
+
+# Maximum number of concurrent jobs for the project
+max_jobs: 1
+
+environment:
+  matrix:
+  - job_name: Linux build
+    appveyor_build_worker_image: Ubuntu
+
+  - job_name: Windows build
+    appveyor_build_worker_image: Visual Studio 2022
+
+branches:
+  only:
+    - master
+
+matrix:
+  fast_finish: true
+
+init:
+  - appveyor version
+
+# job-specific configurations
+for:
+
+  -
+    matrix:
+      only:
+        - job_name: Windows build
+    install:
+      - cd %APPVEYOR_BUILD_FOLDER%
+      - git submodule update --init --recursive
+      - python -m pip install cpp-coveralls
+      - mkdir -p \tmp\tools
+      - cd C:\Tools\vcpkg
+      - git pull
+      - .\bootstrap-vcpkg.bat
+      - vcpkg integrate install
+      - cd %APPVEYOR_BUILD_FOLDER%
+    build_script:
+      - cmake -B build -S .
+      - cmake --build build
+      - cd build
+    test_script:
+      - ctest
+
+  -
+    matrix:
+      only:
+        - job_name: Linux build
+    install:
+      - sudo apt-get install g++-9 gcc-9 -y
+      - cd $APPVEYOR_BUILD_FOLDER
+      - git submodule update --init --recursive
+      - python -m pip install cpp-coveralls
+      - mkdir -p /tmp/tools
+    build_script:
+      - mkdir build
+      - cd build
+      - cmake .. && make
+    test_script:
+      - ./test/boolinq-test
+      - ./test/boolinq-test14
+      - ./bench/boolinq-bench
+    on_success:
+      - case "$CC" in clang-*) echo "Processing llvm coverage with llvm-cov, bypass gcov in cpp-coveralls and submitting"; find test/CMakeFiles/boolinq-test.dir/ -name '*.cpp.o' | xargs llvm-cov gcov -lp ; coveralls --root .. --include include --no-gcov --verbose ;; *) echo "Processing with gcov in cpp-coveralls and submitting"; coveralls --root .. --include include --gcov-options '\-lp' --gcov $GCOV --verbose ;; esac
